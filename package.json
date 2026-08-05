@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
+    "@types/jszip": "^3.4.0",
     "canvas-confetti": "^1.9.4",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.344.0",
     "pdfjs-dist": "^3.11.174",
     "react": "^18.2.0",

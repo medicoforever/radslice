@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { FilmSlice, WindowSettings, ActiveTool, LineMeasurement, ScaleCalibration } from '../types';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Ruler, Touchpad } from 'lucide-react';
 
 interface StackViewerProps {
   slices: FilmSlice[];
@@ -34,6 +34,12 @@ export const StackViewer: React.FC<StackViewerProps> = ({
 
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+
+  // Touch Swipe Gesture State
+  const touchStartYRef = useRef<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+
+  // Measurement State
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
@@ -45,19 +51,54 @@ export const StackViewer: React.FC<StackViewerProps> = ({
     e.preventDefault();
     if (slices.length <= 1) return;
     if (e.deltaY > 0) {
-      // Scroll Down -> Next Slice
       if (currentSliceIndex < slices.length - 1) {
         onSliceChange(currentSliceIndex + 1);
       }
     } else if (e.deltaY < 0) {
-      // Scroll Up -> Previous Slice
       if (currentSliceIndex > 0) {
         onSliceChange(currentSliceIndex - 1);
       }
     }
   };
 
-  // 2. Render Image Canvas with Windowing & Measurements
+  // 2. Touch Screen Swipe Gesture Engine for Mobile / Tablet
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (activeTool === 'MEASURE_LINE') return; // Let measurement tool handle touches
+    if (e.touches.length === 1) {
+      touchStartYRef.current = e.touches[0].clientY;
+      touchStartXRef.current = e.touches[0].clientX;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (activeTool === 'MEASURE_LINE' || touchStartYRef.current === null) return;
+    if (e.changedTouches.length > 0) {
+      const touchEndY = e.changedTouches[0].clientY;
+      const touchEndX = e.changedTouches[0].clientX;
+
+      const diffY = touchStartYRef.current - touchEndY;
+      const diffX = (touchStartXRef.current || 0) - touchEndX;
+
+      // Vertical or Horizontal Swipe Detection (> 25px)
+      if (Math.abs(diffY) > 25 || Math.abs(diffX) > 25) {
+        if (diffY > 25 || diffX > 25) {
+          // Swipe Up / Right -> Next Slice
+          if (currentSliceIndex < slices.length - 1) {
+            onSliceChange(currentSliceIndex + 1);
+          }
+        } else if (diffY < -25 || diffX < -25) {
+          // Swipe Down / Left -> Previous Slice
+          if (currentSliceIndex > 0) {
+            onSliceChange(currentSliceIndex - 1);
+          }
+        }
+      }
+    }
+    touchStartYRef.current = null;
+    touchStartXRef.current = null;
+  };
+
+  // 3. Render Canvas with Brightness/Contrast/Invert & Measurement Lines
   useEffect(() => {
     if (!currentSlice || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -70,21 +111,16 @@ export const StackViewer: React.FC<StackViewerProps> = ({
       canvas.width = currentSlice.width;
       canvas.height = currentSlice.height;
 
-      // Clear Canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Apply CSS Filters for Brightness, Contrast, Invert, WL/WW
-      // Map windowLevel/Width to CSS contrast & brightness
-      const brightnessVal = 100 + windowSettings.brightness + (windowSettings.windowLevel - 128) * 0.4;
-      const contrastVal = 100 + windowSettings.contrast + (255 - windowSettings.windowWidth) * 0.5;
+      // Brightness & Contrast CSS Filters
+      const brightnessVal = 100 + windowSettings.brightness;
+      const contrastVal = 100 + windowSettings.contrast;
       const invertVal = windowSettings.invert ? 100 : 0;
 
       ctx.filter = `brightness(${brightnessVal}%) contrast(${contrastVal}%) invert(${invertVal}%)`;
-
-      // Draw slice image
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Reset filter for measurement layer drawing
       ctx.filter = 'none';
 
       // Draw saved line measurements for this slice
@@ -97,33 +133,31 @@ export const StackViewer: React.FC<StackViewerProps> = ({
         ctx.lineTo(line.x2, line.y2);
         ctx.stroke();
 
-        // Draw start/end handles
         ctx.fillStyle = line.color || '#00e5ff';
         ctx.beginPath();
         ctx.arc(line.x1, line.y1, 4, 0, Math.PI * 2);
         ctx.arc(line.x2, line.y2, 4, 0, Math.PI * 2);
         ctx.fill();
 
-        // Text label
         const midX = (line.x1 + line.x2) / 2;
         const midY = (line.y1 + line.y2) / 2;
 
         ctx.fillStyle = '#090d16';
-        ctx.fillRect(midX - 30, midY - 14, 60, 18);
+        ctx.fillRect(midX - 35, midY - 14, 70, 20);
         ctx.strokeStyle = '#00e5ff';
         ctx.lineWidth = 1;
-        ctx.strokeRect(midX - 30, midY - 14, 60, 18);
+        ctx.strokeRect(midX - 35, midY - 14, 70, 20);
 
         ctx.fillStyle = '#00e5ff';
         ctx.font = 'bold 11px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${line.distanceMm.toFixed(1)} mm`, midX, midY);
+        ctx.fillText(`${line.distanceMm.toFixed(1)} mm`, midX, midY + 1);
       });
 
       // Draw active dragging measurement line
       if (isDrawing && drawStart && drawCurrent) {
         ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(drawStart.x, drawStart.y);
@@ -147,21 +181,21 @@ export const StackViewer: React.FC<StackViewerProps> = ({
     };
   }, [currentSlice, windowSettings, lineMeasurements, isDrawing, drawStart, drawCurrent, scaleCalibration]);
 
-  // Handle Canvas Mouse Events for Measurement Tool
-  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Precise Canvas Coordinate Translation
+  const getCanvasCoords = (clientX: number, clientY: number) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
     const scaleX = canvasRef.current.width / rect.width;
     const scaleY = canvasRef.current.height / rect.height;
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (activeTool !== 'MEASURE_LINE' || !currentSlice) return;
-    const coords = getCanvasCoords(e);
+    const coords = getCanvasCoords(e.clientX, e.clientY);
     setIsDrawing(true);
     setDrawStart(coords);
     setDrawCurrent(coords);
@@ -169,12 +203,12 @@ export const StackViewer: React.FC<StackViewerProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
-    setDrawCurrent(getCanvasCoords(e));
+    setDrawCurrent(getCanvasCoords(e.clientX, e.clientY));
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !drawStart || !drawCurrent || !currentSlice) return;
-    const coords = getCanvasCoords(e);
+    const coords = getCanvasCoords(e.clientX, e.clientY);
     const dx = coords.x - drawStart.x;
     const dy = coords.y - drawStart.y;
     const distPx = Math.sqrt(dx * dx + dy * dy);
@@ -214,27 +248,32 @@ export const StackViewer: React.FC<StackViewerProps> = ({
       <div
         ref={containerRef}
         onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         className="relative bg-dicom-grid bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center min-h-[440px] max-h-[600px] select-none shadow-2xl group"
       >
         {/* HUD Top Left - Patient Info */}
-        <div className="absolute top-3 left-3 z-10 font-mono text-[11px] text-cyan-300 pointer-events-none hud-glow bg-slate-950/70 p-2 rounded-xl border border-slate-800/80 backdrop-blur-sm">
+        <div className="absolute top-3 left-3 z-10 font-mono text-[11px] text-cyan-300 pointer-events-none hud-glow bg-slate-950/80 p-2 rounded-xl border border-slate-800 backdrop-blur-sm">
           <div className="font-bold">{patientHeaderInfo || 'RADSLICE DICOM VIEWER'}</div>
           <div className="text-slate-400 text-[10px]">{sequenceName}</div>
+          {currentSlice.sourceFileName && (
+            <div className="text-cyan-400/80 text-[9px] mt-0.5">File: {currentSlice.sourceFileName}</div>
+          )}
         </div>
 
         {/* HUD Top Right - Slice Counter */}
-        <div className="absolute top-3 right-3 z-10 font-mono text-xs font-bold text-cyan-400 pointer-events-none bg-cyan-950/80 border border-cyan-500/40 px-3 py-1 rounded-xl shadow-lg backdrop-blur-sm">
+        <div className="absolute top-3 right-3 z-10 font-mono text-xs font-bold text-cyan-400 pointer-events-none bg-cyan-950/90 border border-cyan-500/40 px-3 py-1 rounded-xl shadow-lg backdrop-blur-sm">
           Slice {currentSliceIndex + 1} / {slices.length}
         </div>
 
-        {/* HUD Bottom Left - WL/WW Status */}
-        <div className="absolute bottom-3 left-3 z-10 font-mono text-[10px] text-slate-400 pointer-events-none bg-slate-950/70 p-1.5 rounded-xl border border-slate-800 backdrop-blur-sm">
-          WL: {windowSettings.windowLevel} | WW: {windowSettings.windowWidth} | Scale: {scaleCalibration.ratioMmPerPx.toFixed(2)} mm/px
+        {/* HUD Bottom Left - Scale Status */}
+        <div className="absolute bottom-3 left-3 z-10 font-mono text-[10px] text-slate-400 pointer-events-none bg-slate-950/80 p-1.5 rounded-xl border border-slate-800 backdrop-blur-sm">
+          Scale: {scaleCalibration.ratioMmPerPx.toFixed(2)} mm/px
         </div>
 
-        {/* HUD Bottom Right - Mouse Scroll Guide */}
-        <div className="absolute bottom-3 right-3 z-10 text-[10px] font-mono text-slate-400 pointer-events-none bg-slate-950/70 px-2 py-1 rounded-lg border border-slate-800 hidden sm:block">
-          🖱️ Scroll Wheel to Step Slices
+        {/* HUD Bottom Right - Touch & Scroll Hint */}
+        <div className="absolute bottom-3 right-3 z-10 text-[10px] font-mono text-slate-400 pointer-events-none bg-slate-950/80 px-2 py-1 rounded-lg border border-slate-800">
+          📱 Swipe Screen / Wheel Scroll Slices
         </div>
 
         {/* Main Canvas Element */}
@@ -258,7 +297,7 @@ export const StackViewer: React.FC<StackViewerProps> = ({
             onClick={() => onSliceChange(Math.max(0, currentSliceIndex - 1))}
             disabled={currentSliceIndex === 0}
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 disabled:opacity-30 border border-slate-800 transition-colors"
-            title="Previous Slice (Scroll Up)"
+            title="Previous Slice"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -267,7 +306,7 @@ export const StackViewer: React.FC<StackViewerProps> = ({
             onClick={() => onSliceChange(Math.min(slices.length - 1, currentSliceIndex + 1))}
             disabled={currentSliceIndex === slices.length - 1}
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 disabled:opacity-30 border border-slate-800 transition-colors"
-            title="Next Slice (Scroll Down)"
+            title="Next Slice"
           >
             <ChevronRight className="w-4 h-4" />
           </button>

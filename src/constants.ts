@@ -1,4 +1,4 @@
-import { GeminiModelInfo, WindowPreset } from './types';
+import { GeminiModelInfo } from './types';
 
 export const GEMINI_MODELS: GeminiModelInfo[] = [
   {
@@ -32,84 +32,9 @@ export const GEMINI_MODELS: GeminiModelInfo[] = [
     badge: 'Ultra Fast',
     description: 'Lightweight model for maximum speed and minimal token latency.',
   },
-  {
-    id: 'gemini-3-pro',
-    name: 'Gemini 3 Pro',
-    badge: '3.0 Pro',
-    description: 'Deep reasoning multimodal model for complex clinical image interpretation.',
-  },
-  {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    badge: '2.5 Pro',
-    description: 'Advanced vision model for high-precision diagnostic insights.',
-  },
 ];
 
 export const DEFAULT_MODEL_ID = 'gemini-3.6-flash';
-
-export const WINDOW_PRESETS: WindowPreset[] = [
-  {
-    id: 'default',
-    name: 'Standard DICOM',
-    brightness: 0,
-    contrast: 0,
-    windowLevel: 128,
-    windowWidth: 255,
-    invert: false,
-    description: 'Original image appearance without modified windowing.',
-  },
-  {
-    id: 'brain',
-    name: 'Brain Window',
-    brightness: 15,
-    contrast: 35,
-    windowLevel: 140,
-    windowWidth: 160,
-    invert: false,
-    description: 'Optimized for gray/white matter differentiation (WL 40 / WW 80 equivalent).',
-  },
-  {
-    id: 'bone',
-    name: 'Bone Window',
-    brightness: -20,
-    contrast: 65,
-    windowLevel: 190,
-    windowWidth: 100,
-    invert: false,
-    description: 'High contrast for cortical bone trabeculae and fracture inspection.',
-  },
-  {
-    id: 'lung',
-    name: 'Lung / High Contrast',
-    brightness: 25,
-    contrast: 50,
-    windowLevel: 100,
-    windowWidth: 220,
-    invert: false,
-    description: 'Enhances subtle parenchymal densities and micro-nodules.',
-  },
-  {
-    id: 'soft_tissue',
-    name: 'Soft Tissue',
-    brightness: 10,
-    contrast: 20,
-    windowLevel: 130,
-    windowWidth: 200,
-    invert: false,
-    description: 'Balanced contrast for musculature, visceral organs, and fat planes.',
-  },
-  {
-    id: 'invert',
-    name: 'Inverted Negative',
-    brightness: 0,
-    contrast: 25,
-    windowLevel: 128,
-    windowWidth: 255,
-    invert: true,
-    description: 'Black-on-white inverted view for high detail edge detection.',
-  },
-];
 
 export const FILM_ANALYSIS_PROMPT = `You are RadSlice AI, an expert radiologist vision assistant specializing in medical film sheet (CT film, MRI film sheet, X-ray matrix) sub-image decomposition and sequence grouping.
 
@@ -123,8 +48,8 @@ YOUR TASKS:
    - xmin: left boundary (0 = left of image, 1000 = right of image)
    - ymax: bottom boundary
    - xmax: right boundary
-4. Group each sub-image into its respective radiology sequence series:
-   - e.g. "T2 Axial", "T1 Axial", "FLAIR Axial", "T1 Post-Contrast", "Sagittal T2", "Coronal T2", "CT Soft Tissue", "CT Bone Window", "Localizer / Scout", or "Other".
+4. Classify each sub-image into a standard radiology sequence category:
+   - Use standardized clear sequence names such as "T2 Axial", "T1 Axial", "FLAIR Axial", "T1 Post-Contrast", "Sagittal T2", "Coronal T2", "CT Soft Tissue", "CT Bone Window", "Localizer / Scout", or "Other".
 5. Assign a relative slice number (1, 2, 3...) in anatomical order (inferior to superior or anterior to posterior) within each sequence.
 6. Provide a short clinical impression / finding for the overall study.
 

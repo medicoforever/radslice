@@ -1,24 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FilmAnalysisResult } from '../types';
-import { FileText, Download, Printer, Layers, Clock, Sparkles, CheckCircle2 } from 'lucide-react';
+import { exportPatientFilmPackageZip } from '../services/zipExportService';
+import { FileText, Download, Printer, Layers, Sparkles, Package, Smartphone } from 'lucide-react';
 
 interface AnalysisReportProps {
   result: FilmAnalysisResult;
 }
 
 export const AnalysisReport: React.FC<AnalysisReportProps> = ({ result }) => {
+  const [downloadingZip, setDownloadingZip] = useState(false);
+
   const handlePrint = () => {
     window.print();
   };
 
-  const handleDownloadJson = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(result, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `RadSlice_Analysis_${Date.now()}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+  const handleDownloadZip = async () => {
+    setDownloadingZip(true);
+    try {
+      await exportPatientFilmPackageZip(result);
+    } catch (err) {
+      console.error('ZIP export error:', err);
+    } finally {
+      setDownloadingZip(false);
+    }
   };
 
   return (
@@ -44,23 +48,49 @@ export const AnalysisReport: React.FC<AnalysisReportProps> = ({ result }) => {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center flex-wrap gap-2">
+          {/* Download Mobile HTML ZIP Button */}
           <button
-            onClick={handleDownloadJson}
-            className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+            onClick={handleDownloadZip}
+            disabled={downloadingZip}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center space-x-2 shadow-lg transition-all"
+            title="Download ZIP package containing standalone HTML viewers for mobile & offline viewing"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export JSON</span>
+            <Package className="w-4 h-4" />
+            <Smartphone className="w-4 h-4" />
+            <span>{downloadingZip ? 'Packaging ZIP...' : 'Download Mobile HTML ZIP'}</span>
           </button>
 
           <button
             onClick={handlePrint}
-            className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md transition-colors"
+            className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print Report</span>
           </button>
         </div>
+      </div>
+
+      {/* Mobile ZIP Package Highlight Banner */}
+      <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-between gap-4 text-xs text-slate-300">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold shrink-0">
+            <Smartphone className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-cyan-300">Offline Mobile Viewers in ZIP Package</h4>
+            <p className="text-slate-400 text-[11px]">
+              Extracting the ZIP package gives you separate <strong className="text-slate-200">.html</strong> files for each category (T1, T2, FLAIR...). Anyone can open them on any smartphone or tablet browser to scroll through slices offline!
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleDownloadZip}
+          disabled={downloadingZip}
+          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3.5 py-2 rounded-xl text-xs whitespace-nowrap shadow-md"
+        >
+          Get ZIP
+        </button>
       </div>
 
       {/* Grid Summary Stats */}
@@ -71,27 +101,27 @@ export const AnalysisReport: React.FC<AnalysisReportProps> = ({ result }) => {
         </div>
 
         <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-          <div className="text-[10px] uppercase font-mono text-slate-500">Sequences Grouped</div>
+          <div className="text-[10px] uppercase font-mono text-slate-500">Sequence Categories</div>
           <div className="text-lg font-black text-slate-100 mt-0.5">{result.sequences.length} Series</div>
         </div>
 
         <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-          <div className="text-[10px] uppercase font-mono text-slate-500">Resolution</div>
+          <div className="text-[10px] uppercase font-mono text-slate-500">Files Uploaded</div>
           <div className="text-lg font-black text-emerald-400 mt-0.5">
-            {result.sourceImageWidth} × {result.sourceImageHeight}
+            {result.uploadedFilesCount || 1} Film Sheet(s)
           </div>
         </div>
 
         <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-          <div className="text-[10px] uppercase font-mono text-slate-500">Vision Precision</div>
-          <div className="text-lg font-black text-cyan-400 mt-0.5">0-1000 Box 2D</div>
+          <div className="text-[10px] uppercase font-mono text-slate-500">Touch Swipe Mode</div>
+          <div className="text-lg font-black text-cyan-400 mt-0.5">Enabled 📱</div>
         </div>
       </div>
 
       {/* Sequences Breakdown Table */}
       <div className="space-y-2">
         <h4 className="text-xs font-extrabold uppercase font-mono text-slate-400 tracking-wider">
-          Detected Sequence Breakdown
+          Categorized Sequence Viewers
         </h4>
         <div className="space-y-2">
           {result.sequences.map((seq) => (
@@ -125,11 +155,6 @@ export const AnalysisReport: React.FC<AnalysisReportProps> = ({ result }) => {
           <span>Gemini Vision Impression & Technical Summary</span>
         </div>
         <p className="text-slate-300 leading-relaxed">{result.overallImpression}</p>
-        {result.recommendations && (
-          <div className="pt-2 border-t border-cyan-500/20 text-slate-400 font-mono text-[11px]">
-            <strong className="text-cyan-300">Recommendations:</strong> {result.recommendations}
-          </div>
-        )}
       </div>
     </div>
   );

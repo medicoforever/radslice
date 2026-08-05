@@ -5,9 +5,9 @@ import { ProcessingStatus } from './components/ProcessingStatus';
 import { ViewerContainer } from './components/ViewerContainer';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
-import { FilmAnalysisResult } from './types';
+import { FilmAnalysisResult, UploadedFileItem } from './types';
 import { getSelectedModel, setSelectedModel as saveSelectedModel, getApiKeys } from './services/storageService';
-import { analyzeFilmSheetWithGemini } from './services/gemini';
+import { analyzeMultipleFilmSheetsWithGemini } from './services/gemini';
 import { generateSampleMriFilmSheet } from './services/sampleData';
 
 export const App: React.FC = () => {
@@ -22,7 +22,6 @@ export const App: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    // Show onboarding tour on first visit if no keys
     if (getApiKeys().length === 0) {
       setOnboardingOpen(true);
     }
@@ -37,13 +36,13 @@ export const App: React.FC = () => {
     setHasApiKeys(getApiKeys().length > 0);
   };
 
-  const handleImageSelected = async (dataUrl: string, fileName: string) => {
+  const handleFilesSelected = async (files: UploadedFileItem[]) => {
     setErrorMsg(null);
     setProcessing(true);
 
     try {
-      const result = await analyzeFilmSheetWithGemini(
-        dataUrl,
+      const result = await analyzeMultipleFilmSheetsWithGemini(
+        files,
         selectedModel,
         (status) => setProcessingStatus(status)
       );
@@ -51,11 +50,13 @@ export const App: React.FC = () => {
       setProcessing(false);
     } catch (err: any) {
       setProcessing(false);
-      console.error('Film sheet analysis failed:', err);
+      console.error('Multi-film analysis failed:', err);
       if (err.message?.includes('NO_API_KEY')) {
         setApiKeyModalOpen(true);
       } else {
-        setErrorMsg(err.message || 'Failed to analyze film sheet. Please check your API key quota or try another model.');
+        setErrorMsg(
+          err.message || 'Failed to analyze film sheet(s). Please check your API key quota or try another model.'
+        );
       }
     }
   };
@@ -97,7 +98,7 @@ export const App: React.FC = () => {
           />
         ) : (
           <ImageUploader
-            onImageSelected={handleImageSelected}
+            onFilesSelected={handleFilesSelected}
             onRunSampleDemo={handleRunSampleDemo}
             onOpenApiKeyModal={() => setApiKeyModalOpen(true)}
             hasApiKeys={hasApiKeys}
@@ -124,7 +125,7 @@ export const App: React.FC = () => {
       <footer className="border-t border-slate-900 bg-slate-950/90 py-4 px-4 text-center text-xs text-slate-500 font-mono">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div>RadSlice AI • Powered by Gemini Vision 3.6 / 3.5 Flash</div>
-          <div>100% Client-Side Privacy • Stored in Browser LocalStorage</div>
+          <div>100% Client-Side Privacy • Multi-File Categorizer & Standalone HTML ZIP Export</div>
         </div>
       </footer>
 

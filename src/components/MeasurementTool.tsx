@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ActiveTool, ScaleCalibration, LineMeasurement, AngleMeasurement } from '../types';
-import { Ruler, MousePointer, Scale, Compass, Square, Trash2, CheckCircle2 } from 'lucide-react';
+import { ActiveTool, ScaleCalibration, LineMeasurement } from '../types';
+import { Ruler, MousePointer, Scale, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface MeasurementToolProps {
   activeTool: ActiveTool;
@@ -44,69 +44,57 @@ export const MeasurementTool: React.FC<MeasurementToolProps> = ({
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
         <div className="flex items-center space-x-2 font-extrabold text-slate-200">
           <Ruler className="w-4 h-4 text-cyan-400" />
-          <span>Radiology Measurement & Calibration</span>
+          <span>Radiology Measurement</span>
         </div>
         {scaleCalibration.isCalibrated ? (
           <span className="text-[10px] bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono flex items-center space-x-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            <span>Calibrated (1px = {scaleCalibration.ratioMmPerPx.toFixed(3)}mm)</span>
+            <span>Scale: {scaleCalibration.ratioMmPerPx.toFixed(2)} mm/px</span>
           </span>
         ) : (
-          <span className="text-[10px] bg-amber-950/60 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono">
-            Uncalibrated (Pixel scale)
+          <span className="text-[10px] bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-mono">
+            Default 0.25 mm/px
           </span>
         )}
       </div>
 
-      {/* Tool Selection Grid */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Tool Selection */}
+      <div className="grid grid-cols-3 gap-1.5">
         <button
           onClick={() => onSelectTool('SELECT')}
-          className={`p-2.5 rounded-xl border flex items-center space-x-2 font-semibold transition-all ${
+          className={`p-2 rounded-xl border flex flex-col items-center justify-center space-y-1 font-semibold transition-all ${
             activeTool === 'SELECT'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md'
+              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md font-bold'
               : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'
           }`}
         >
           <MousePointer className="w-4 h-4" />
-          <span>Pan / Navigate</span>
+          <span className="text-[10px]">Navigate</span>
         </button>
 
         <button
           onClick={() => onSelectTool('MEASURE_LINE')}
-          className={`p-2.5 rounded-xl border flex items-center space-x-2 font-semibold transition-all ${
+          className={`p-2 rounded-xl border flex flex-col items-center justify-center space-y-1 font-semibold transition-all ${
             activeTool === 'MEASURE_LINE'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md'
+              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md font-bold'
               : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'
           }`}
         >
           <Ruler className="w-4 h-4" />
-          <span>Line Distance</span>
+          <span className="text-[10px]">Measure Line</span>
         </button>
 
         <button
           onClick={() => setShowCalibrationModal(true)}
-          className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-cyan-300 border border-slate-800 hover:border-cyan-500/50 flex items-center space-x-2 font-semibold transition-all"
+          className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-cyan-300 border border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center space-y-1 font-semibold transition-all"
         >
           <Scale className="w-4 h-4" />
-          <span>Calibrate Scale</span>
-        </button>
-
-        <button
-          onClick={() => onSelectTool('MEASURE_ANGLE')}
-          className={`p-2.5 rounded-xl border flex items-center space-x-2 font-semibold transition-all ${
-            activeTool === 'MEASURE_ANGLE'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md'
-              : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'
-          }`}
-        >
-          <Compass className="w-4 h-4" />
-          <span>Angle (Cobb)</span>
+          <span className="text-[10px]">Calibrate</span>
         </button>
       </div>
 
       {/* Active Line Measurements List for Current Slice */}
-      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+      <div className="space-y-2 pt-1 border-t border-slate-800/80">
         <div className="flex justify-between items-center">
           <span className="text-[10px] uppercase font-mono font-bold text-slate-400">
             Slice Measurements ({sliceLines.length})
@@ -124,7 +112,7 @@ export const MeasurementTool: React.FC<MeasurementToolProps> = ({
 
         {sliceLines.length === 0 ? (
           <div className="p-3 rounded-xl bg-slate-950/60 text-slate-500 text-[11px] text-center border border-dashed border-slate-800">
-            Click & drag on the image slice to draw distance measurement lines.
+            Click & drag (or touch) on the viewer slice to draw distance measurement lines.
           </div>
         ) : (
           <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
@@ -135,9 +123,8 @@ export const MeasurementTool: React.FC<MeasurementToolProps> = ({
               >
                 <div className="flex items-center space-x-2">
                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
-                  <span className="text-slate-300 font-bold">L{idx + 1}:</span>
+                  <span className="text-slate-300 font-bold">Line {idx + 1}:</span>
                   <span className="text-cyan-300 font-bold">{m.distanceMm.toFixed(1)} mm</span>
-                  <span className="text-slate-500 text-[10px]">({Math.round(m.distancePx)} px)</span>
                 </div>
                 <button
                   onClick={() => onDeleteLineMeasurement(m.id)}
@@ -154,14 +141,14 @@ export const MeasurementTool: React.FC<MeasurementToolProps> = ({
 
       {/* Scale Calibration Modal */}
       {showCalibrationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
             <h4 className="text-sm font-extrabold text-slate-100 flex items-center space-x-2">
               <Scale className="w-4 h-4 text-cyan-400" />
-              <span>Calibrate DICOM Scale Bar</span>
+              <span>Calibrate DICOM Scale Ruler</span>
             </h4>
             <p className="text-xs text-slate-400">
-              Enter the known pixel length and real-world millimeter distance (e.g. 100 pixels = 20 mm scale ruler on film sheet).
+              Enter the known pixel distance and real-world millimeter scale (e.g. 100 pixels = 25 mm ruler on film sheet).
             </p>
 
             <div className="space-y-3">

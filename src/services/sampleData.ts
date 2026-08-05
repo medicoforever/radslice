@@ -211,6 +211,7 @@ export const generateSampleMriFilmSheet = (): FilmAnalysisResult => {
     bodyPart: 'Brain',
     patientHeaderInfo: 'DOE^JOHN [M/45] | ID: MR-889201',
     totalSubImagesDetected: 12,
+    uploadedFilesCount: 1,
     sequences: sequenceGroups,
     overallImpression: 'Multi-sequence MRI Brain film sheet parsed into 12 sub-images across 4 sequences (T2 Axial, FLAIR Axial, T1 Sagittal, Localizer). Ventricular system is symmetric with normal midline alignment.',
     recommendations: 'No acute intracranial hemorrhage or territorial infarction identified.',

@@ -13,8 +13,8 @@ import { GridViewer } from './GridViewer';
 import { WindowControls } from './WindowControls';
 import { MeasurementTool } from './MeasurementTool';
 import { AnalysisReport } from './AnalysisReport';
-import { WINDOW_PRESETS } from '../constants';
-import { RotateCcw, FileText, Image as ImageIcon } from 'lucide-react';
+import { exportPatientFilmPackageZip } from '../services/zipExportService';
+import { RotateCcw, FileText, Package, Smartphone } from 'lucide-react';
 
 interface ViewerContainerProps {
   analysisResult: FilmAnalysisResult;
@@ -31,13 +31,12 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
   const [currentSliceIndex, setCurrentSliceIndex] = useState(0);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('STACK');
   const [activeTool, setActiveTool] = useState<ActiveTool>('SELECT');
+  const [downloadingZip, setDownloadingZip] = useState(false);
 
-  // Windowing Settings
+  // Streamlined Windowing Settings (Brightness, Contrast, Invert)
   const [windowSettings, setWindowSettings] = useState<WindowSettings>({
     brightness: 0,
     contrast: 0,
-    windowLevel: 128,
-    windowWidth: 255,
     invert: false,
   });
 
@@ -55,7 +54,6 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
 
   // Filter Slices by Selected Sequence
   const activeSequence = analysisResult.sequences.find((s) => s.id === selectedSeqId);
-
   const activeSlices = activeSequence
     ? activeSequence.slices
     : analysisResult.sequences.flatMap((s) => s.slices);
@@ -82,6 +80,17 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
     setLineMeasurements([]);
   };
 
+  const handleDownloadZip = async () => {
+    setDownloadingZip(true);
+    try {
+      await exportPatientFilmPackageZip(analysisResult);
+    } catch (e) {
+      console.error('ZIP export error:', e);
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4 animate-fade-in">
       {/* Top Controls Bar */}
@@ -101,20 +110,36 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
           <div className="text-xs font-mono">
             <span className="text-slate-400">Study: </span>
             <span className="font-bold text-cyan-300">{analysisResult.title}</span>
+            {analysisResult.uploadedFilesCount > 1 && (
+              <span className="ml-2 text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
+                {analysisResult.uploadedFilesCount} Films Merged
+              </span>
+            )}
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Download Mobile HTML ZIP button */}
+          <button
+            onClick={handleDownloadZip}
+            disabled={downloadingZip}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md transition-all"
+            title="Download ZIP package containing standalone HTML viewers for mobile & offline viewing"
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>{downloadingZip ? 'Packaging ZIP...' : 'Download Mobile HTML ZIP'}</span>
+          </button>
+
           <button
             onClick={() => setShowReportModal(!showReportModal)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-md ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-md ${
               showReportModal
                 ? 'bg-cyan-500 text-slate-950 shadow-cyan-500/20'
                 : 'bg-slate-950 text-cyan-300 border border-slate-800 hover:bg-slate-800'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>AI Radiology Report</span>
+            <span>AI Report</span>
           </button>
         </div>
       </div>
@@ -169,7 +194,7 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
 
         {/* Right 1 Column: Controls Panel */}
         <div className="space-y-4">
-          {/* DICOM Windowing WL/WW Controls */}
+          {/* Streamlined Image Adjustments */}
           <WindowControls
             settings={windowSettings}
             onChangeSettings={setWindowSettings}
@@ -177,8 +202,6 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
               setWindowSettings({
                 brightness: 0,
                 contrast: 0,
-                windowLevel: 128,
-                windowWidth: 255,
                 invert: false,
               })
             }

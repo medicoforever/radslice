@@ -1,6 +1,6 @@
 import React from 'react';
 import { FilmSlice, WindowSettings } from '../types';
-import { Eye, ExternalLink } from 'lucide-react';
+import { Eye } from 'lucide-react';
 
 interface GridViewerProps {
   slices: FilmSlice[];
@@ -13,8 +13,8 @@ export const GridViewer: React.FC<GridViewerProps> = ({
   windowSettings,
   onSelectSlice,
 }) => {
-  const brightnessVal = 100 + windowSettings.brightness + (windowSettings.windowLevel - 128) * 0.4;
-  const contrastVal = 100 + windowSettings.contrast + (255 - windowSettings.windowWidth) * 0.5;
+  const brightnessVal = 100 + windowSettings.brightness;
+  const contrastVal = 100 + windowSettings.contrast;
   const invertVal = windowSettings.invert ? 100 : 0;
   const filterStyle = `brightness(${brightnessVal}%) contrast(${contrastVal}%) invert(${invertVal}%)`;
 

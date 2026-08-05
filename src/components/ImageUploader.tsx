@@ -1,16 +1,17 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, Image as ImageIcon, Play, Sparkles, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Image as ImageIcon, Play, Sparkles, AlertCircle, Layers } from 'lucide-react';
 import { rasterizePdfFile } from '../services/pdfService';
+import { UploadedFileItem } from '../types';
 
 interface ImageUploaderProps {
-  onImageSelected: (dataUrl: string, fileName: string) => void;
+  onFilesSelected: (files: UploadedFileItem[]) => void;
   onRunSampleDemo: () => void;
   onOpenApiKeyModal: () => void;
   hasApiKeys: boolean;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
-  onImageSelected,
+  onFilesSelected,
   onRunSampleDemo,
   onOpenApiKeyModal,
   hasApiKeys,
@@ -20,40 +21,47 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const processFile = async (file: File) => {
+  const processFileList = async (fileList: FileList | File[]) => {
     setErrorMsg(null);
-    if (!file) return;
+    if (!fileList || fileList.length === 0) return;
 
-    const fileType = file.type;
-    const fileName = file.name;
+    const items: UploadedFileItem[] = [];
+    const files = Array.from(fileList);
 
-    if (fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf')) {
-      setLoadingPdf(true);
-      try {
-        const pages = await rasterizePdfFile(file, 2.0);
-        setLoadingPdf(false);
-        if (pages.length === 0) {
-          setErrorMsg('Could not render any pages from the selected PDF.');
-          return;
+    for (const file of files) {
+      const fileType = file.type;
+      const fileName = file.name;
+
+      if (fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf')) {
+        setLoadingPdf(true);
+        try {
+          const pages = await rasterizePdfFile(file, 2.0);
+          setLoadingPdf(false);
+          pages.forEach((p) => {
+            items.push({
+              dataUrl: p.dataUrl,
+              name: `${fileName} (Page ${p.pageIndex})`,
+            });
+          });
+        } catch (err: any) {
+          setLoadingPdf(false);
+          console.error('PDF error:', err);
+          setErrorMsg(`Failed to render PDF: ${err.message || 'Corrupted file'}`);
         }
-        // Send first page of PDF
-        onImageSelected(pages[0].dataUrl, `${fileName} (Page 1)`);
-      } catch (err: any) {
-        setLoadingPdf(false);
-        console.error('PDF processing error:', err);
-        setErrorMsg(`Failed to render PDF: ${err.message || 'Corrupted file'}`);
+      } else if (fileType.startsWith('image/')) {
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+        items.push({ dataUrl, name: fileName });
       }
-    } else if (fileType.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        if (result) {
-          onImageSelected(result, fileName);
-        }
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setErrorMsg('Unsupported file format. Please upload an image (.png, .jpg, .webp) or PDF file.');
+    }
+
+    if (items.length > 0) {
+      onFilesSelected(items);
+    } else if (!errorMsg) {
+      setErrorMsg('Please select valid image (.png, .jpg, .webp) or PDF film sheet files.');
     }
   };
 
@@ -61,7 +69,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFile(e.dataTransfer.files[0]);
+      processFileList(e.dataTransfer.files);
     }
   };
 
@@ -84,7 +92,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <div>
               <p className="font-bold text-amber-300">No Gemini API Key Configured</p>
               <p className="text-amber-200/80">
-                You can try the <strong className="text-white">Brain MRI Demo</strong> right now without a key! To analyze custom uploaded films, please add a free key.
+                Try the <strong className="text-white">Brain MRI Demo</strong> right now! Add a free key to analyze custom patient film uploads.
               </p>
             </div>
           </div>
@@ -97,7 +105,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         </div>
       )}
 
-      {/* Main Drop Area */}
+      {/* Main Drop Area - Supports Multi-File Upload */}
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -112,8 +120,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         <input
           type="file"
           ref={fileInputRef}
-          onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])}
+          onChange={(e) => e.target.files && processFileList(e.target.files)}
           accept="image/*,.pdf"
+          multiple
           className="hidden"
         />
 
@@ -127,23 +136,26 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           </div>
 
           <div>
-            <h2 className="text-xl font-bold text-slate-100">
-              Upload Radiology Film Sheet or PDF Report
+            <h2 className="text-xl font-bold text-slate-100 flex items-center justify-center space-x-2">
+              <span>Upload Patient Radiology Film Sheet(s)</span>
+              <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                Multi-File Upload
+              </span>
             </h2>
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              Drag & drop CT film sheets, MRI multi-slice film matrix, X-ray grids, or PDF files. Gemini Vision will auto-crop sub-images & group sequences.
+              Select or drop any number of CT / MRI film photos or PDFs for the same patient. Gemini Vision will categorize similar sequences (T1, T2, FLAIR, etc.) into unified category stack viewers.
             </p>
           </div>
 
           <div className="flex items-center space-x-3 text-xs text-slate-400 font-mono pt-2">
             <span className="flex items-center space-x-1">
               <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-              <span>JPG, PNG, WebP</span>
+              <span>Multiple Images (JPG, PNG, WebP)</span>
             </span>
             <span>•</span>
             <span className="flex items-center space-x-1">
               <FileText className="w-3.5 h-3.5 text-blue-400" />
-              <span>Medical PDFs</span>
+              <span>Multi-Page PDFs</span>
             </span>
           </div>
 
@@ -178,9 +190,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
           <div className="space-y-1">
-            <h3 className="text-sm font-bold text-slate-200">Gemini Vision Capabilities</h3>
+            <h3 className="text-sm font-bold text-slate-200">Sequence Grouping Engine</h3>
             <p className="text-xs text-slate-400">
-              Powered by Gemini 3.6 & 3.5 Flash for sub-pixel bounding box accuracy.
+              Gemini Vision classifies T2, T1, FLAIR, and CT series into unified DICOM stack viewers.
             </p>
           </div>
           <a
