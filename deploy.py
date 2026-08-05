@@ -3,7 +3,6 @@ import sys
 import subprocess
 import urllib.request
 import json
-import shutil
 
 TOKEN = "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"
 REPO_NAME = "radslice"
@@ -15,7 +14,7 @@ def run_cmd(cmd, cwd=None):
     print(f"Running: {cmd}")
     res = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True)
     if res.returncode != 0:
-        print(f"Error executing '{cmd}': {res.stderr}")
+        print(f"Notice from '{cmd}': {res.stderr}")
     else:
         print(res.stdout)
     return res.returncode == 0
@@ -51,7 +50,7 @@ def create_github_repo():
                 }
             )
             try:
-                res = urllib.request.urlopen(create_req)
+                urllib.request.urlopen(create_req)
                 print("Repository created successfully!")
             except Exception as create_err:
                 print(f"Failed to create repository: {create_err}")
@@ -80,13 +79,13 @@ def enable_github_pages():
         }
     )
     try:
-        res = urllib.request.urlopen(req)
+        urllib.request.urlopen(req)
         print("GitHub Pages enabled successfully!")
     except urllib.error.HTTPError as e:
         if e.code == 409:
             print("GitHub Pages already enabled.")
         else:
-            print(f"GitHub Pages API Notice ({e.code}): {e.read().decode('utf-8')}")
+            print(f"GitHub Pages API Notice ({e.code})")
 
 def main():
     if not create_github_repo():
@@ -103,10 +102,10 @@ def main():
     run_cmd("git config user.email 'medicoforever002@gmail.com'")
 
     run_cmd("git branch -M main")
+    run_cmd("git rm -r --cached node_modules", cwd=os.getcwd())
     run_cmd("git add .")
     run_cmd('git commit -m "Initial commit - RadSlice AI web application"')
 
-    # Remove existing remote if any
     run_cmd("git remote remove origin")
     run_cmd(f"git remote add origin {REPO_URL}")
 
@@ -117,7 +116,6 @@ def main():
     print("Deploying dist build to gh-pages branch...")
     dist_dir = os.path.join(os.getcwd(), "dist")
     if os.path.exists(dist_dir):
-        # Create a temporary git repo inside dist to push directly to gh-pages
         run_cmd("git init", cwd=dist_dir)
         run_cmd("git config user.name 'medicoforever'", cwd=dist_dir)
         run_cmd("git config user.email 'medicoforever002@gmail.com'", cwd=dist_dir)
@@ -131,7 +129,7 @@ def main():
     enable_github_pages()
 
     print("\n" + "="*60)
-    print("🎉 SUCCESS! RadSlice AI is deployed live!")
+    print("SUCCESS! RadSlice AI is deployed live!")
     print(f"Repository: https://github.com/{USER_NAME}/{REPO_NAME}")
     print(f"Live App URL: {LIVE_URL}")
     print("="*60 + "\n")
