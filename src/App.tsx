@@ -122,10 +122,23 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/90 py-4 px-4 text-center text-xs text-slate-500 font-mono">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div>RadSlice AI • Powered by Gemini Vision 3.6 / 3.5 Flash</div>
-          <div>100% Client-Side Privacy • Multi-File Categorizer & Standalone HTML ZIP Export</div>
+      <footer className="border-t border-slate-900 bg-slate-950/90 py-6 px-4 text-center text-xs text-slate-500 font-mono">
+        <div className="max-w-7xl mx-auto flex flex-col items-center gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+            <div>RadSlice AI • Powered by Gemini Vision</div>
+            <div>100% Client-Side Privacy • Multi-File Categorizer & Standalone HTML ZIP Export</div>
+          </div>
+          
+          <div className="border-t border-slate-800/60 w-full pt-4 mt-2">
+            <div className="text-cyan-400 font-bold mb-3 uppercase tracking-widest text-[10px]">SUBSCRIBE TO OUR CHANNELS FOR MORE UPDATES & ANNOUNCEMENTS</div>
+            <div className="flex flex-wrap justify-center gap-4 text-[11px] font-sans font-semibold">
+              <a href="https://whatsapp.com/channel/0029Vb2S2bW0G0Xq94mR721T" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800 hover:border-emerald-500/30">WhatsApp Channel</a>
+              <a href="https://youtube.com/@raddoc96" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-rose-400 transition-colors bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800 hover:border-rose-500/30">YouTube Channel</a>
+              <a href="https://t.me/raddocs" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-400 transition-colors bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800 hover:border-blue-500/30">Telegram Channel</a>
+              <a href="https://t.me/radiology_chatgpt" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-400 transition-colors bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800 hover:border-blue-500/30">Telegram Group</a>
+              <a href="https://x.com/raddoc96" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-slate-200 transition-colors bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800 hover:border-slate-500/30">X (Twitter)</a>
+            </div>
+          </div>
         </div>
       </footer>
 
