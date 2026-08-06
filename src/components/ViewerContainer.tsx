@@ -27,7 +27,9 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
   selectedModel,
   onResetUpload,
 }) => {
-  const [selectedSeqId, setSelectedSeqId] = useState<string | 'ALL'>('ALL');
+  const [selectedSeqId, setSelectedSeqId] = useState<string>(
+    analysisResult.sequences.length > 0 ? analysisResult.sequences[0].id : ''
+  );
   const [currentSliceIndex, setCurrentSliceIndex] = useState(0);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('STACK');
   const [activeTool, setActiveTool] = useState<ActiveTool>('SELECT');
@@ -56,7 +58,9 @@ export const ViewerContainer: React.FC<ViewerContainerProps> = ({
   const activeSequence = analysisResult.sequences.find((s) => s.id === selectedSeqId);
   const activeSlices = activeSequence
     ? activeSequence.slices
-    : analysisResult.sequences.flatMap((s) => s.slices);
+    : analysisResult.sequences.length > 0
+    ? analysisResult.sequences[0].slices
+    : [];
 
   const handleUpdateCalibration = (knownPx: number, knownMm: number) => {
     const ratio = knownMm / knownPx;

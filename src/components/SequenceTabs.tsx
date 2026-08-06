@@ -4,8 +4,8 @@ import { Layers, Grid, SquareStack, Check } from 'lucide-react';
 
 interface SequenceTabsProps {
   sequences: SequenceGroup[];
-  selectedSeqId: string | 'ALL';
-  onSelectSeq: (seqId: string | 'ALL') => void;
+  selectedSeqId: string;
+  onSelectSeq: (seqId: string) => void;
   displayMode: DisplayMode;
   onToggleDisplayMode: (mode: DisplayMode) => void;
   totalSliceCount: number;
@@ -21,26 +21,7 @@ export const SequenceTabs: React.FC<SequenceTabsProps> = ({
 }) => {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 p-2 rounded-2xl border border-slate-800 shadow-md">
-      {/* Sequence Selector Tabs */}
       <div className="flex items-center space-x-1.5 overflow-x-auto py-0.5 max-w-full">
-        <button
-          onClick={() => onSelectSeq('ALL')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 whitespace-nowrap ${
-            selectedSeqId === 'ALL'
-              ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>All Sequences</span>
-          <span
-            className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-              selectedSeqId === 'ALL' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            {totalSliceCount}
-          </span>
-        </button>
 
         {sequences.map((seq) => {
           const isSelected = selectedSeqId === seq.id;
