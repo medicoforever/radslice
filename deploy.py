@@ -4,10 +4,13 @@ import subprocess
 import urllib.request
 import json
 
-TOKEN = "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"
+# Note: Use `git config credential.helper store` or SSH to authenticate.
+# Or provide TOKEN as an env var if running in CI.
+import os
+TOKEN = os.environ.get("GITHUB_TOKEN", "")
 REPO_NAME = "radslice"
 USER_NAME = "medicoforever"
-REPO_URL = f"https://{TOKEN}@github.com/{USER_NAME}/{REPO_NAME}.git"
+REPO_URL = f"https://{TOKEN + '@' if TOKEN else ''}github.com/{USER_NAME}/{REPO_NAME}.git"
 LIVE_URL = f"https://{USER_NAME}.github.io/{REPO_NAME}/"
 
 def run_cmd(cmd, cwd=None):
