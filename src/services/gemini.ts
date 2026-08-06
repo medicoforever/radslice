@@ -77,59 +77,72 @@ export const analyzeMultipleFilmSheetsWithGemini = async (
     const base64Data = fileItem.dataUrl.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
     const mimeType = fileItem.dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,/)?.[1] || 'image/jpeg';
 
-    // 3. Request Gemini Vision with failover key rotation
+    // 3. Request Gemini Vision with failover key rotation and model fallback
+    const modelsToTry = Array.from(new Set([selectedModel, 'gemini-3.5-flash', 'gemini-3.0-flash']));
+    
     let geminiResponseText = '';
     let lastError: any = null;
-    const attemptedKeys = new Set<string>();
 
-    while (attemptedKeys.size < keys.length) {
-      const apiKey = getRandomApiKey();
-      if (!apiKey || attemptedKeys.has(apiKey)) continue;
-      attemptedKeys.add(apiKey);
-
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
-        const payload = {
-          contents: [
-            {
-              parts: [
-                { text: FILM_ANALYSIS_PROMPT },
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data,
-                  },
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-          },
-        };
-
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          if (response.status === 429) {
-            console.warn(`API key rate limited (429), retrying next key...`);
-            continue;
-          }
-          const errText = await response.text();
-          throw new Error(`Gemini API Error ${response.status}: ${errText}`);
-        }
-
-        const data = await response.json();
-        geminiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (geminiResponseText) break;
-      } catch (err: any) {
-        lastError = err;
+    for (const currentModel of modelsToTry) {
+      if (geminiResponseText) break;
+      
+      const attemptedKeys = new Set<string>();
+      if (onProgress) {
+        onProgress(`Trying model ${currentModel} on film ${fileIdx + 1}...`);
       }
+
+      while (attemptedKeys.size < keys.length) {
+        const apiKey = getRandomApiKey();
+        if (!apiKey || attemptedKeys.has(apiKey)) continue;
+        attemptedKeys.add(apiKey);
+
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+          const payload = {
+            contents: [
+              {
+                parts: [
+                  { text: FILM_ANALYSIS_PROMPT },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+            },
+          };
+
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            if (response.status === 429 || response.status === 503) {
+              console.warn(`Model ${currentModel} on key hit 429/503. Retrying next key...`);
+              lastError = new Error(`Rate limit exceeded for model ${currentModel}`);
+              continue;
+            }
+            const errText = await response.text();
+            throw new Error(`Gemini API Error ${response.status}: ${errText}`);
+          }
+
+          const data = await response.json();
+          geminiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (geminiResponseText) break;
+        } catch (err: any) {
+          lastError = err;
+        }
+      }
+      
+      // If we failed after all keys for this model, the outer loop will advance to the next fallback model.
     }
 
     if (!geminiResponseText) {

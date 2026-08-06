@@ -20,6 +20,7 @@ export const App: React.FC = () => {
   const [processingStatus, setProcessingStatus] = useState('Initializing vision module...');
   const [analysisResult, setAnalysisResult] = useState<FilmAnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<UploadedFileItem[] | null>(null);
 
   useEffect(() => {
     if (getApiKeys().length === 0) {
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
   const handleFilesSelected = async (files: UploadedFileItem[]) => {
     setErrorMsg(null);
     setProcessing(true);
+    setPendingFiles(files);
 
     try {
       const result = await analyzeMultipleFilmSheetsWithGemini(
@@ -48,6 +50,7 @@ export const App: React.FC = () => {
       );
       setAnalysisResult(result);
       setProcessing(false);
+      setPendingFiles(null);
     } catch (err: any) {
       setProcessing(false);
       console.error('Multi-film analysis failed:', err);
@@ -58,6 +61,12 @@ export const App: React.FC = () => {
           err.message || 'Failed to analyze film sheet(s). Please check your API key quota or try another model.'
         );
       }
+    }
+  };
+
+  const handleResumeProcessing = () => {
+    if (pendingFiles) {
+      handleFilesSelected(pendingFiles);
     }
   };
 
@@ -105,18 +114,41 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* Global Error Alert */}
+        {/* Global Error Alert & Resume Controls */}
         {errorMsg && !processing && (
-          <div className="max-w-2xl mx-auto my-6 p-4 rounded-2xl bg-rose-950/80 border border-rose-800 text-rose-200 text-xs flex items-start justify-between gap-3 shadow-xl">
-            <div>
-              <strong className="font-bold text-rose-300">Analysis Error:</strong> {errorMsg}
+          <div className="max-w-3xl mx-auto my-6 p-4 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="text-rose-400 font-bold mt-0.5">⚠️</div>
+              <div className="flex-1">
+                <strong className="font-bold text-rose-400 block mb-1">Process Paused due to Error:</strong>
+                <p className="text-slate-300 text-sm leading-relaxed">{errorMsg}</p>
+              </div>
+              <button onClick={() => setErrorMsg(null)} className="text-slate-500 hover:text-slate-300">✕</button>
             </div>
-            <button
-              onClick={() => setErrorMsg(null)}
-              className="text-rose-400 hover:text-rose-200 font-bold"
-            >
-              ✕
-            </button>
+            {pendingFiles && (
+              <div className="flex flex-wrap items-center justify-between border-t border-slate-800 pt-4 mt-2 gap-4">
+                <div className="text-xs text-slate-400">
+                  Your <strong className="text-slate-200">{pendingFiles.length} file(s)</strong> are safely paused in memory. You can select a different Gemini model from the header and try again.
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setPendingFiles(null);
+                      setErrorMsg(null);
+                    }}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-colors"
+                  >
+                    Cancel & Clear Files
+                  </button>
+                  <button
+                    onClick={handleResumeProcessing}
+                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-cyan-900/50"
+                  >
+                    ▶ Resume Processing
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

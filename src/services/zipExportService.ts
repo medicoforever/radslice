@@ -1,33 +1,41 @@
-import JSZip from 'jszip';
-import { FilmAnalysisResult, SequenceGroup } from '../types';
+import { FilmAnalysisResult } from '../types';
 
-const generateStandaloneCategoryHtml = (
-  patientTitle: string,
-  seqGroup: SequenceGroup
-): string => {
-  const slicesJson = JSON.stringify(
-    seqGroup.slices.map((s, idx) => ({
-      index: idx + 1,
-      globalIndex: s.globalIndex,
-      dataUrl: s.croppedDataUrl,
-      note: s.anatomicalNote || '',
-      finding: s.keyFinding || '',
+export const exportPatientFilmPackageZip = async (
+  result: FilmAnalysisResult
+): Promise<void> => {
+  // We keep the function name the same for compatibility, but it now exports a unified HTML file.
+  
+  const allDataJson = JSON.stringify({
+    title: result.title,
+    modality: result.modality,
+    bodyPart: result.bodyPart,
+    sequences: result.sequences.map(seq => ({
+      id: seq.id,
+      name: seq.name,
+      viewType: seq.viewType,
+      slices: seq.slices.map(s => ({
+        index: s.sequenceIndex,
+        globalIndex: s.globalIndex,
+        dataUrl: s.croppedDataUrl,
+        note: s.anatomicalNote || '',
+        finding: s.keyFinding || '',
+      }))
     }))
-  ).replace(/</g, '\\u003c');
+  }).replace(/</g, '\\u003c');
 
-  return `<!DOCTYPE html>
+  const htmlContent = `<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>${seqGroup.name} Viewer | ${patientTitle}</title>
+  <title>RadSlice Standalone Viewer | ${result.title}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background-color: #06090e;
       color: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      min-h: 100vh;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       user-select: none;
@@ -36,7 +44,7 @@ const generateStandaloneCategoryHtml = (
     header {
       background: rgba(15, 23, 42, 0.9);
       backdrop-filter: blur(10px);
-      border-bottom: 1px border #1e293b;
+      border-bottom: 1px solid #1e293b;
       padding: 12px 16px;
       display: flex;
       justify-content: space-between;
@@ -44,15 +52,35 @@ const generateStandaloneCategoryHtml = (
     }
     h1 { font-size: 16px; color: #38bdf8; font-weight: 800; }
     .subtitle { font-size: 11px; color: #94a3b8; }
-    .badge {
-      background: rgba(14, 165, 233, 0.2);
-      color: #38bdf8;
-      border: 1px solid rgba(14, 165, 233, 0.4);
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      font-weight: bold;
+    
+    .tabs {
+      display: flex;
+      overflow-x: auto;
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      padding: 8px 12px 0 12px;
+      gap: 8px;
+      scrollbar-width: none; /* Firefox */
     }
+    .tabs::-webkit-scrollbar { display: none; } /* Safari and Chrome */
+    .tab {
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tab.active {
+      background: #020617;
+      color: #38bdf8;
+      border-color: #1e293b;
+    }
+
     main {
       flex: 1;
       display: flex;
@@ -64,7 +92,7 @@ const generateStandaloneCategoryHtml = (
     }
     .viewer-box {
       position: relative;
-      background: #020617;
+      background: #000;
       border: 1px solid #1e293b;
       border-radius: 16px;
       overflow: hidden;
@@ -114,6 +142,7 @@ const generateStandaloneCategoryHtml = (
       background: rgba(2, 6, 23, 0.7);
       padding: 4px 8px;
       border-radius: 6px;
+      pointer-events: none;
     }
     .controls-bar {
       width: 100%;
@@ -157,23 +186,24 @@ const generateStandaloneCategoryHtml = (
 <body>
   <header>
     <div>
-      <h1>${seqGroup.name}</h1>
-      <div class="subtitle">${patientTitle}</div>
+      <h1>RadSlice AI Viewer</h1>
+      <div class="subtitle">${result.title} | ${result.modality}</div>
     </div>
-    <div class="badge">${seqGroup.slices.length} Slices</div>
   </header>
+
+  <div class="tabs" id="tabsContainer"></div>
 
   <main>
     <div class="viewer-box" id="viewerContainer">
-      <div class="hud-title">${seqGroup.name}</div>
-      <div class="hud-counter" id="counter">1 / ${seqGroup.slices.length}</div>
+      <div class="hud-title" id="hudTitle">Sequence</div>
+      <div class="hud-counter" id="counter">1 / X</div>
       <img id="mainImage" class="slice-img" src="" alt="Slice View">
       <div class="touch-hint">📱 Swipe screen / Wheel to scroll slices</div>
     </div>
 
     <div class="controls-bar">
       <button id="prevBtn" class="step-btn">◀</button>
-      <input type="range" id="sliceSlider" min="0" max="${seqGroup.slices.length - 1}" value="0">
+      <input type="range" id="sliceSlider" min="0" max="0" value="0">
       <button id="nextBtn" class="step-btn">▶</button>
     </div>
 
@@ -181,124 +211,105 @@ const generateStandaloneCategoryHtml = (
   </main>
 
   <script>
-    const slices = ${slicesJson};
-    let currentIndex = 0;
+    const db = ${allDataJson};
+    let activeSeqIndex = 0;
+    let currentSliceIndex = 0;
 
+    const tabsContainer = document.getElementById('tabsContainer');
     const mainImage = document.getElementById('mainImage');
+    const hudTitle = document.getElementById('hudTitle');
     const counter = document.getElementById('counter');
     const slider = document.getElementById('sliceSlider');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const noteBox = document.getElementById('noteBox');
-    const container = document.getElementById('viewerContainer');
+    const viewerContainer = document.getElementById('viewerContainer');
+
+    function renderTabs() {
+      tabsContainer.innerHTML = '';
+      db.sequences.forEach((seq, idx) => {
+        const tab = document.createElement('div');
+        tab.className = 'tab ' + (idx === activeSeqIndex ? 'active' : '');
+        tab.textContent = seq.name + ' (' + seq.slices.length + ')';
+        tab.onclick = () => {
+          activeSeqIndex = idx;
+          currentSliceIndex = 0;
+          renderTabs();
+          loadSequence();
+        };
+        tabsContainer.appendChild(tab);
+      });
+    }
+
+    function loadSequence() {
+      const seq = db.sequences[activeSeqIndex];
+      hudTitle.textContent = seq.name;
+      slider.max = seq.slices.length - 1;
+      updateSlice(0);
+    }
 
     function updateSlice(index) {
-      if (index < 0 || index >= slices.length) return;
-      currentIndex = index;
-      const s = slices[currentIndex];
+      const seq = db.sequences[activeSeqIndex];
+      if (!seq || index < 0 || index >= seq.slices.length) return;
+      
+      currentSliceIndex = index;
+      const s = seq.slices[currentSliceIndex];
+      
       mainImage.src = s.dataUrl;
-      counter.textContent = (currentIndex + 1) + ' / ' + slices.length;
-      slider.value = currentIndex;
-      prevBtn.disabled = currentIndex === 0;
-      nextBtn.disabled = currentIndex === slices.length - 1;
+      counter.textContent = (currentSliceIndex + 1) + ' / ' + seq.slices.length;
+      slider.value = currentSliceIndex;
+      prevBtn.disabled = currentSliceIndex === 0;
+      nextBtn.disabled = currentSliceIndex === seq.slices.length - 1;
       noteBox.textContent = 'Slice ' + s.index + ' (Global #' + s.globalIndex + '): ' + (s.note || 'No notes');
     }
 
-    prevBtn.addEventListener('click', () => updateSlice(currentIndex - 1));
-    nextBtn.addEventListener('click', () => updateSlice(currentIndex + 1));
+    prevBtn.addEventListener('click', () => updateSlice(currentSliceIndex - 1));
+    nextBtn.addEventListener('click', () => updateSlice(currentSliceIndex + 1));
     slider.addEventListener('input', (e) => updateSlice(parseInt(e.target.value)));
 
     // Wheel Scroll
-    container.addEventListener('wheel', (e) => {
+    viewerContainer.addEventListener('wheel', (e) => {
       e.preventDefault();
-      if (e.deltaY > 0) updateSlice(currentIndex + 1);
-      else if (e.deltaY < 0) updateSlice(currentIndex - 1);
+      if (e.deltaY > 0) updateSlice(currentSliceIndex + 1);
+      else if (e.deltaY < 0) updateSlice(currentSliceIndex - 1);
     }, { passive: false });
 
     // Touch Swipe Gesture
     let touchStartY = 0;
-    container.addEventListener('touchstart', (e) => {
+    viewerContainer.addEventListener('touchstart', (e) => {
       touchStartY = e.touches[0].clientY;
     });
 
-    container.addEventListener('touchend', (e) => {
+    viewerContainer.addEventListener('touchend', (e) => {
       const touchEndY = e.changedTouches[0].clientY;
       const diffY = touchStartY - touchEndY;
       if (Math.abs(diffY) > 30) {
-        if (diffY > 0) updateSlice(currentIndex + 1); // Swipe Up -> Next
-        else updateSlice(currentIndex - 1); // Swipe Down -> Prev
+        if (diffY > 0) updateSlice(currentSliceIndex + 1);
+        else updateSlice(currentSliceIndex - 1);
       }
     });
 
     // Keyboard Arrows
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') updateSlice(currentIndex + 1);
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') updateSlice(currentIndex - 1);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') updateSlice(currentSliceIndex + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') updateSlice(currentSliceIndex - 1);
     });
 
-    // Initial Load
-    updateSlice(0);
+    // Initialize
+    if (db.sequences.length > 0) {
+      renderTabs();
+      loadSequence();
+    }
   </script>
 </body>
 </html>`;
-};
 
-export const exportPatientFilmPackageZip = async (
-  result: FilmAnalysisResult
-): Promise<void> => {
-  const zip = new JSZip();
-
-  // 1. Generate Category Standalone HTML Files
-  result.sequences.forEach((seqGroup) => {
-    const fileName = `${seqGroup.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Viewer.html`;
-    const htmlContent = generateStandaloneCategoryHtml(result.title, seqGroup);
-    zip.file(fileName, htmlContent);
-  });
-
-  // 2. Generate Index.html for overall patient overview
-  const indexHtmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${result.title} | RadSlice AI Patient Package</title>
-  <style>
-    body { background: #06090e; color: #f1f5f9; font-family: system-ui, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-    h1 { color: #38bdf8; font-size: 22px; }
-    .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 16px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: inherit; }
-    .card:hover { border-color: #38bdf8; }
-    .btn { background: #0284c7; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <h1>🩻 ${result.title}</h1>
-  <p style="color:#94a3b8; font-size:13px; margin-top:4px;">Modality: ${result.modality} | ${result.totalSubImagesDetected} Slices | ${result.sequences.length} Categories</p>
-
-  <h2 style="font-size:16px; margin-top:24px; color:#e2e8f0;">Sequence Categories (Click to open viewer)</h2>
-  ${result.sequences
-    .map(
-      (seq) => `
-    <a href="${seq.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Viewer.html" class="card">
-      <div>
-        <h3 style="font-size:15px; font-weight:bold; color:#38bdf8;">${seq.name}</h3>
-        <p style="font-size:12px; color:#94a3b8; margin-top:2px;">${seq.slices.length} Slices (${seq.viewType})</p>
-      </div>
-      <span class="btn">Open Viewer ➔</span>
-    </a>
-  `
-    )
-    .join('')}
-</body>
-</html>`;
-
-  zip.file('Index.html', indexHtmlContent);
-
-  // 3. Generate ZIP Blob and trigger download
-  const blob = await zip.generateAsync({ type: 'blob' });
+  // Output as a single HTML file instead of ZIP
+  const blob = new Blob([htmlContent], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `RadSlice_${result.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_Package.zip`;
+  link.download = `RadSlice_${result.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_Viewer.html`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
