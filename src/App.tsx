@@ -5,10 +5,21 @@ import { ProcessingStatus } from './components/ProcessingStatus';
 import { ViewerContainer } from './components/ViewerContainer';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
-import { FilmAnalysisResult, UploadedFileItem } from './types';
+import { FilmAnalysisResult, UploadedFileItem, FilmSlice } from './types';
 import { getSelectedModel, setSelectedModel as saveSelectedModel, getApiKeys } from './services/storageService';
-import { analyzeMultipleFilmSheetsWithGemini } from './services/gemini';
+import { analyzeSingleFilmSheet, buildAnalysisResult } from './services/gemini';
 import { generateSampleMriFilmSheet } from './services/sampleData';
+
+interface ProcessingState {
+  files: UploadedFileItem[];
+  currentIndex: number;
+  slices: FilmSlice[];
+  impressions: string[];
+  title: string;
+  modality: 'MRI' | 'CT' | 'XRAY' | 'ULTRASOUND' | 'UNKNOWN';
+  bodyPart: string;
+  startTime: number;
+}
 
 export const App: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<string>(getSelectedModel());
@@ -20,7 +31,7 @@ export const App: React.FC = () => {
   const [processingStatus, setProcessingStatus] = useState('Initializing vision module...');
   const [analysisResult, setAnalysisResult] = useState<FilmAnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [pendingFiles, setPendingFiles] = useState<UploadedFileItem[] | null>(null);
+  const [procState, setProcState] = useState<ProcessingState | null>(null);
 
   useEffect(() => {
     if (getApiKeys().length === 0) {
@@ -37,22 +48,51 @@ export const App: React.FC = () => {
     setHasApiKeys(getApiKeys().length > 0);
   };
 
-  const handleFilesSelected = async (files: UploadedFileItem[]) => {
+  const processQueue = async (state: ProcessingState) => {
     setErrorMsg(null);
     setProcessing(true);
-    setPendingFiles(files);
+    setProcState(state);
+
+    let currentState = { ...state };
 
     try {
-      const result = await analyzeMultipleFilmSheetsWithGemini(
-        files,
-        selectedModel,
-        (status) => setProcessingStatus(status)
+      for (let i = currentState.currentIndex; i < currentState.files.length; i++) {
+        currentState.currentIndex = i;
+        setProcState({ ...currentState });
+
+        const file = currentState.files[i];
+        const res = await analyzeSingleFilmSheet(
+          file,
+          i,
+          currentState.files.length,
+          selectedModel,
+          (status) => setProcessingStatus(status)
+        );
+
+        currentState.slices.push(...res.slices);
+        if (res.overallImpression) currentState.impressions.push(res.overallImpression);
+        if (!currentState.title && res.title) currentState.title = res.title;
+        if (res.modality) currentState.modality = res.modality;
+        if (res.bodyPart) currentState.bodyPart = res.bodyPart;
+      }
+
+      // Loop finished successfully
+      const finalResult = buildAnalysisResult(
+        currentState.files,
+        currentState.slices,
+        currentState.impressions,
+        currentState.title,
+        currentState.modality,
+        currentState.bodyPart,
+        Date.now() - currentState.startTime
       );
-      setAnalysisResult(result);
+
+      setAnalysisResult(finalResult);
       setProcessing(false);
-      setPendingFiles(null);
+      setProcState(null);
     } catch (err: any) {
       setProcessing(false);
+      setProcState(currentState);
       console.error('Multi-film analysis failed:', err);
       if (err.message?.includes('NO_API_KEY')) {
         setApiKeyModalOpen(true);
@@ -64,9 +104,23 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleFilesSelected = async (files: UploadedFileItem[]) => {
+    const initialState: ProcessingState = {
+      files,
+      currentIndex: 0,
+      slices: [],
+      impressions: [],
+      title: '',
+      modality: 'MRI',
+      bodyPart: 'Brain',
+      startTime: Date.now()
+    };
+    processQueue(initialState);
+  };
+
   const handleResumeProcessing = () => {
-    if (pendingFiles) {
-      handleFilesSelected(pendingFiles);
+    if (procState) {
+      processQueue(procState);
     }
   };
 
@@ -125,15 +179,15 @@ export const App: React.FC = () => {
               </div>
               <button onClick={() => setErrorMsg(null)} className="text-slate-500 hover:text-slate-300">✕</button>
             </div>
-            {pendingFiles && (
+            {procState && (
               <div className="flex flex-wrap items-center justify-between border-t border-slate-800 pt-4 mt-2 gap-4">
                 <div className="text-xs text-slate-400">
-                  Your <strong className="text-slate-200">{pendingFiles.length} file(s)</strong> are safely paused in memory. You can select a different Gemini model from the header and try again.
+                  You have <strong className="text-slate-200">{procState.files.length - procState.currentIndex} file(s)</strong> left to process (out of {procState.files.length}). Progress is saved. You can select a different model and resume.
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      setPendingFiles(null);
+                      setProcState(null);
                       setErrorMsg(null);
                     }}
                     className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-colors"
