@@ -234,6 +234,50 @@ export const StackViewer: React.FC<StackViewerProps> = ({
     setDrawCurrent(null);
   };
 
+  const handleTouchStartCanvas = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (activeTool !== 'MEASURE_LINE' || !currentSlice) return;
+    const touch = e.touches[0];
+    const coords = getCanvasCoords(touch.clientX, touch.clientY);
+    setIsDrawing(true);
+    setDrawStart(coords);
+    setDrawCurrent(coords);
+  };
+
+  const handleTouchMoveCanvas = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const touch = e.touches[0];
+    setDrawCurrent(getCanvasCoords(touch.clientX, touch.clientY));
+  };
+
+  const handleTouchEndCanvas = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !drawStart || !drawCurrent || !currentSlice) return;
+    const touch = e.changedTouches[0];
+    const coords = getCanvasCoords(touch.clientX, touch.clientY);
+    const dx = coords.x - drawStart.x;
+    const dy = coords.y - drawStart.y;
+    const distPx = Math.sqrt(dx * dx + dy * dy);
+
+    if (distPx > 5) {
+      const distMm = distPx * scaleCalibration.ratioMmPerPx;
+      const newLine: LineMeasurement = {
+        id: `meas-${Date.now()}`,
+        sliceId: currentSlice.id,
+        x1: drawStart.x,
+        y1: drawStart.y,
+        x2: coords.x,
+        y2: coords.y,
+        distancePx: distPx,
+        distanceMm: distMm,
+        color: '#00e5ff',
+      };
+      onAddLineMeasurement(newLine);
+    }
+
+    setIsDrawing(false);
+    setDrawStart(null);
+    setDrawCurrent(null);
+  };
+
   if (!currentSlice) {
     return (
       <div className="p-12 text-center text-slate-500 font-mono">
@@ -276,12 +320,14 @@ export const StackViewer: React.FC<StackViewerProps> = ({
           📱 Swipe Screen / Wheel Scroll Slices
         </div>
 
-        {/* Main Canvas Element */}
         <canvas
           ref={canvasRef}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onTouchStart={handleTouchStartCanvas}
+          onTouchMove={handleTouchMoveCanvas}
+          onTouchEnd={handleTouchEndCanvas}
           className={`dicom-canvas max-w-full max-h-[520px] object-contain transition-transform ${
             activeTool === 'MEASURE_LINE' ? 'cursor-crosshair' : 'cursor-grab'
           }`}

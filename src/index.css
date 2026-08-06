@@ -52,10 +52,8 @@
   border-color: rgba(56, 189, 248, 0.3);
 }
 
-/* Canvas contrast filter animations */
+/* Canvas rendering optimizations */
 canvas.dicom-canvas {
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
   touch-action: none;
 }
 

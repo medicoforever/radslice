@@ -13,7 +13,7 @@ const generateStandaloneCategoryHtml = (
       note: s.anatomicalNote || '',
       finding: s.keyFinding || '',
     }))
-  );
+  ).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -80,7 +80,6 @@ const generateStandaloneCategoryHtml = (
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
-      image-rendering: -webkit-optimize-contrast;
     }
     .hud-counter {
       position: absolute;
