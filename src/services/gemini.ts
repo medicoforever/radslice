@@ -67,7 +67,7 @@ export const analyzeSingleFilmSheet = async (
   const mimeType = fileItem.dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,/)?.[1] || 'image/jpeg';
 
   // 3. Request Gemini Vision with failover key rotation and model fallback
-  const modelsToTry = Array.from(new Set([selectedModel, 'gemini-3.5-flash', 'gemini-3.0-flash']));
+  const modelsToTry = Array.from(new Set([selectedModel, 'gemini-3.5-flash', 'gemini-3-flash-preview']));
   
   let geminiResponseText = '';
   let lastError: any = null;

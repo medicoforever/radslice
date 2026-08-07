@@ -15,9 +15,9 @@ export const GEMINI_MODELS: GeminiModelInfo[] = [
     description: 'High efficiency vision model for instant image breakdown and sequence tagging.',
   },
   {
-    id: 'gemini-3.0-flash',
-    name: 'Gemini 3.0 Flash',
-    badge: '3.0 Flash',
+    id: 'gemini-3-flash-preview',
+    name: 'Gemini 3 Flash Preview',
+    badge: '3 Flash',
     description: 'Fast multimodal model with robust spatial vision understanding.',
   },
   {
