@@ -178,7 +178,20 @@ export const analyzeSingleFilmSheet = async (
     const croppedDataUrl = sliceCanvas.toDataURL('image/png');
 
     const rawSeqName = item.sequenceName || 'Sequence 1';
-    const normalizedSeqName = rawSeqName.trim();
+    let normalizedSeqName = rawSeqName.trim();
+    const rawView = item.viewType || 'AXIAL';
+
+    // Normalization safeguard: if sequenceName does not reflect view plane, append viewType
+    const lowerName = normalizedSeqName.toLowerCase();
+    if (rawView === 'CORONAL' && !lowerName.includes('cor')) {
+      normalizedSeqName = `${normalizedSeqName} Coronal`;
+    } else if (rawView === 'SAGITTAL' && !lowerName.includes('sag')) {
+      normalizedSeqName = `${normalizedSeqName} Sagittal`;
+    } else if (rawView === 'AXIAL' && !lowerName.includes('ax') && !lowerName.includes('trans')) {
+      normalizedSeqName = `${normalizedSeqName} Axial`;
+    } else if (rawView === 'LOCALIZER' && !lowerName.includes('loc') && !lowerName.includes('scout')) {
+      normalizedSeqName = `${normalizedSeqName} Localizer`;
+    }
 
     slices.push({
       id: `slice-${fileIdx + 1}-${i + 1}-${Date.now()}`,
@@ -229,8 +242,13 @@ export const buildAnalysisResult = (
   let seqIdx = 1;
 
   sequenceMap.forEach((seqSlices, seqName) => {
-    // Sort merged sequence slices by sequenceIndex if provided by Gemini, else keep order
-    seqSlices.sort((a, b) => a.sequenceIndex - b.sequenceIndex);
+    // Sort merged sequence slices by sequenceIndex if provided by Gemini, else by bounding box position
+    seqSlices.sort((a, b) => {
+      if (a.sequenceIndex && b.sequenceIndex && a.sequenceIndex !== b.sequenceIndex) {
+        return a.sequenceIndex - b.sequenceIndex;
+      }
+      return (a.boundingBox.ymin - b.boundingBox.ymin) || (a.boundingBox.xmin - b.boundingBox.xmin);
+    });
 
     // Re-index sequence numbers cleanly
     seqSlices.forEach((s, idx) => {
